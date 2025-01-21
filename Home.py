@@ -13,18 +13,28 @@ from folium.plugins import MarkerCluster
 import streamlit.components.v1 as components  # 用于嵌入 HTML
 
 # 初始化 Google Earth Engine
-# 从环境变量中读取 refresh_token
-refresh_token = os.getenv("EARTHENGINE_TOKEN")
+def ee_initialize():
+    try:
+        # 从 Streamlit secrets 获取凭证
+        credentials = ee.ServiceAccountCredentials(
+            email=st.secrets["ee_service_account"],
+            key_data=st.secrets["ee_token"]
+        )
+        # 初始化 Earth Engine
+        ee.Initialize(credentials)
+        return True
+    except Exception as e:
+        st.error(f"Earth Engine 认证失败: {str(e)}")
+        return False
 
-if refresh_token:
-    credentials = ee.ServiceAccountCredentials('', key_data=None, refresh_token=refresh_token)
-    ee.Initialize(credentials)
-    st.write("Google Earth Engine 已成功授权！")
+# 初始化 Earth Engine
+is_authorized = ee_initialize()
+
+if is_authorized:
+    st.success("Earth Engine 认证成功!")
+    # 这里添加你的主程序代码
 else:
-    st.error("未找到Earth Engine认证token")
-    st.stop()
-ee.Initialize(credentials)
-st.write("Google Earth Engine 已成功授权！")
+    st.error("请确保正确设置 Streamlit secrets")
 
 # Streamlit 界面
 st.title("基于 SWORD 数据集的河流提取与可视化工具")
