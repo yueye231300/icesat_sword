@@ -43,7 +43,6 @@ st.markdown("输入坐标点，生成指定范围内的河流节点数据、河�
 latitude = st.number_input("输入纬度 (Latitude)", value=30.0, format="%.6f")  # 默认长江流域附近
 longitude = st.number_input("输入经度 (Longitude)", value=114.0, format="%.6f")  # 默认长江流域附近
 buffer_distance = st.number_input("缓冲区半径 (米)", value=2000, step=100)  # 默认2公里
-extension_distance = st.number_input("河流宽度扩展距离 (米)", value=50, step=10)  # 默认50米
 
 # 地图容器
 st.markdown("### 地图预览")
@@ -88,7 +87,8 @@ if st.button("生成河流数据并可视化"):
                 "wse": properties.get("wse"),  # 水面高程
                 "width": properties.get("width")  # 河宽
             })
-
+        node_data_width = [node['width'] for node in node_data]
+        width_mean = sum(node_data_width) / len(node_data_width)
         # 将节点连成线
         if len(node_points) > 1:
             center_line = LineString(node_points)
@@ -104,6 +104,7 @@ if st.button("生成河流数据并可视化"):
         # 将中心线投影到局部投影坐标系（以米为单位）
         expanded_center_line = transform(project, center_line)
 
+        extension_distance = st.number_input("河流宽度扩展距离 (米)", value=width_mean, step=10)  # 默认50米
         # 扩展中心线两侧的距离（河流宽度的一半）
         river_polygon = expanded_center_line.buffer(extension_distance)
 
