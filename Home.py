@@ -46,6 +46,38 @@ buffer_distance = st.number_input("缓冲区半径 (米)", value=2000, step=100)
 
 # 地图容器
 st.markdown("### 地图预览")
+import streamlit as st
+import ee
+import folium
+from folium.plugins import MarkerCluster
+import pandas as pd
+import geopandas as gpd
+import pyproj
+from shapely.geometry import Point, LineString
+from shapely.ops import transform
+import streamlit.components.v1 as components
+import tempfile
+import os
+import zipfile
+
+# 初始化 session_state
+if 'nodes_df' not in st.session_state:
+    st.session_state.nodes_df = None
+if 'gdf_river' not in st.session_state:
+    st.session_state.gdf_river = None
+if 'node_data' not in st.session_state:
+    st.session_state.node_data = None
+if 'node_points' not in st.session_state:
+    st.session_state.node_points = None
+if 'center_line' not in st.session_state:
+    st.session_state.center_line = None
+if 'width_mean' not in st.session_state:
+    st.session_state.width_mean = None
+
+# 输入部分（假设已有这些变量）
+longitude = st.number_input("经度", value=116.3)
+latitude = st.number_input("纬度", value=39.9)
+buffer_distance = st.number_input("缓冲区距离（米）", value=1000)
 
 # 当点击按钮时触发
 if st.button("生成河流数据并可视化"):
@@ -87,11 +119,23 @@ if st.button("生成河流数据并可视化"):
                 "wse": properties.get("wse"),  # 水面高程
                 "width": properties.get("width")  # 河宽
             })
+
+        # 存储数据到 session_state
+        st.session_state.node_data = node_data
+        st.session_state.node_points = node_points
+        
+        # 计算平均河宽
         node_data_width = [node['width'] for node in node_data]
-        width_mean = sum(node_data_width) / len(node_data_width)
+        st.session_state.width_mean = sum(node_data_width) / len(node_data_width)
+
+        # 创建节点的 DataFrame
+        nodes_df = pd.DataFrame(node_data)
+        st.session_state.nodes_df = nodes_df  # 存储到 session_state
+
         # 将节点连成线
         if len(node_points) > 1:
             center_line = LineString(node_points)
+            st.session_state.center_line = center_line
         else:
             st.error("节点数量不足以连成线。")
             st.stop()
@@ -104,21 +148,19 @@ if st.button("生成河流数据并可视化"):
         # 将中心线投影到局部投影坐标系（以米为单位）
         expanded_center_line = transform(project, center_line)
 
-        extension_distance = st.number_input("河流宽度扩展距离 (米)", value=width_mean, step=10.0)  # 默认50米
+        extension_distance = st.number_input("河流宽度扩展距离 (米)", value=st.session_state.width_mean, step=10.0)
         # 扩展中心线两侧的距离（河流宽度的一半）
         river_polygon = expanded_center_line.buffer(extension_distance)
 
         # 将结果投影回 WGS84 坐标系
         river_polygon_wgs84 = transform(reverse_project, river_polygon)
 
-        # 创建节点的 DataFrame
-        nodes_df = pd.DataFrame(node_data)
-
         # 创建河流多边形的 GeoDataFrame
         gdf_river = gpd.GeoDataFrame(
             [{'geometry': river_polygon_wgs84, 'name': 'River Polygon'}],
             crs="EPSG:4326"
         )
+        st.session_state.gdf_river = gdf_river  # 存储到 session_state
 
         # 可视化数据（使用 Folium）
         folium_map = folium.Map(location=[latitude, longitude], zoom_start=12)
@@ -162,44 +204,95 @@ if st.button("生成河流数据并可视化"):
             style_function=lambda x: {"color": "blue", "weight": 1, "fillOpacity": 0.3}
         ).add_to(folium_map)
 
+        # 添加图层控制
+        folium.LayerControl().add_to(folium_map)
+
         # 渲染地图到 Streamlit（嵌入 HTML）
         map_html = folium_map._repr_html_()
         components.html(map_html, height=600)
 
-        # 临时保存文件
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # 保存节点数据为 CSV
-            nodes_csv_path = os.path.join(tmpdir, "nodes.csv")
-            nodes_df.to_csv(nodes_csv_path, index=False)
+        # 显示下载部分
+        st.markdown("### 下载数据")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # CSV 下载按钮
+            csv_data = st.session_state.nodes_df.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="下载节点数据 (CSV)",
+                data=csv_data,
+                file_name="river_nodes.csv",
+                mime="text/csv"
+            )
+        
+        with col2:
+            # Shapefile 下载按钮
+            def create_shapefile_zip():
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    # 保存 Shapefile
+                    shp_path = os.path.join(tmpdir, "river_polygon.shp")
+                    st.session_state.gdf_river.to_file(shp_path)
+                    
+                    # 创建压缩文件
+                    zip_path = os.path.join(tmpdir, "river_shapefile.zip")
+                    with zipfile.ZipFile(zip_path, 'w') as zipf:
+                        for file in os.listdir(tmpdir):
+                            if file.startswith("river_polygon"):
+                                file_path = os.path.join(tmpdir, file)
+                                zipf.write(file_path, file)
+                    
+                    # 读取压缩文件
+                    with open(zip_path, 'rb') as f:
+                        return f.read()
+            
+            shapefile_zip = create_shapefile_zip()
+            st.download_button(
+                label="下载河流形状 (Shapefile)",
+                data=shapefile_zip,
+                file_name="river_shapefile.zip",
+                mime="application/zip"
+            )
 
-            # 保存河流多边形数据为 Shapefile
-            river_shp_path = os.path.join(tmpdir, "river_polygon.shp")
-            gdf_river.to_file(river_shp_path)
+        # 添加合并下载选项
+        st.markdown("---")
+        
+        if st.button("生成完整数据包"):
+            with st.spinner("正在打包所有数据..."):
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    # 保存 CSV
+                    csv_path = os.path.join(tmpdir, "nodes.csv")
+                    st.session_state.nodes_df.to_csv(csv_path, index=False)
+                    
+                    # 保存 Shapefile
+                    shp_path = os.path.join(tmpdir, "river_polygon.shp")
+                    st.session_state.gdf_river.to_file(shp_path)
+                    
+                    # 创建完整数据包
+                    zip_path = os.path.join(tmpdir, "complete_river_data.zip")
+                    with zipfile.ZipFile(zip_path, 'w') as zipf:
+                        # 添加 CSV
+                        zipf.write(csv_path, "nodes.csv")
+                        # 添加 Shapefile 相关文件
+                        for file in os.listdir(tmpdir):
+                            if file.startswith("river_polygon"):
+                                file_path = os.path.join(tmpdir, file)
+                                zipf.write(file_path, os.path.join("shapefile", file))
+                    
+                    # 读取完整数据包
+                    with open(zip_path, 'rb') as f:
+                        complete_data = f.read()
+                    
+                    # 提供下载
+                    st.download_button(
+                        label="下载完整数据包 (CSV + Shapefile)",
+                        data=complete_data,
+                        file_name="complete_river_data.zip",
+                        mime="application/zip"
+                    )
 
-            # 创建 zip 文件
-            zip_path = os.path.join(tmpdir, "river_data.zip")
-            with zipfile.ZipFile(zip_path, "w") as zipf:
-                # 添加 CSV 文件
-                zipf.write(nodes_csv_path, arcname="nodes.csv")
-                # 添加所有 Shapefile 文件
-                for file in os.listdir(tmpdir):
-                    if file.endswith(".shp") or file.endswith(".shx") or file.endswith(".dbf") or file.endswith(".prj"):
-                        zipf.write(os.path.join(tmpdir, file), arcname=file)
-
-            # 提供下载
-            st.markdown("### 下载数据")
-            with open(zip_path, "rb") as f:
-                st.download_button(
-                    label="下载河流数据 (CSV 和 Shapefile 压缩包)",
-                    data=f,
-                    file_name="river_data.zip",
-                    mime="application/zip"
-                )
-
-        st.success("CSV 和 Shapefile 文件生成成功！")
+            st.success("数据包生成成功！")
 
     except Exception as e:
         st.error(f"发生错误: {str(e)}")
-        st.write("详细错误信息：")
-        import traceback
-        st.code(traceback.format_exc())
+        st.stop()
