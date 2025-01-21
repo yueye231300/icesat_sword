@@ -16,6 +16,13 @@ import streamlit.components.v1 as components  # 用于嵌入 HTML
 def ee_initialize():
     try:
         # 从 Streamlit secrets 获取凭证
+        # 调试用：检查 secrets 是否正确加载
+        if "ee_token" not in st.secrets:
+            st.error("未找到 ee_token，请检查 .streamlit/secrets.toml 文件")
+            st.stop()
+        if "ee_service_account" not in st.secrets:
+            st.error("未找到 ee_service_account，请检查 .streamlit/secrets.toml 文件")
+            st.stop()
         credentials = ee.ServiceAccountCredentials(
             email=st.secrets["ee_service_account"],
             key_data=st.secrets["ee_token"]
