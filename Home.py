@@ -60,11 +60,6 @@ if 'center_line' not in st.session_state:
 if 'width_mean' not in st.session_state:
     st.session_state.width_mean = None
 
-# 输入部分（假设已有这些变量）
-longitude = st.number_input("经度", value=116.3)
-latitude = st.number_input("纬度", value=39.9)
-buffer_distance = st.number_input("缓冲区距离（米）", value=1000)
-
 # 当点击按钮时触发
 if st.button("生成河流数据并可视化"):
     try:
