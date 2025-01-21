@@ -46,20 +46,6 @@ buffer_distance = st.number_input("缓冲区半径 (米)", value=2000, step=100)
 
 # 地图容器
 st.markdown("### 地图预览")
-import streamlit as st
-import ee
-import folium
-from folium.plugins import MarkerCluster
-import pandas as pd
-import geopandas as gpd
-import pyproj
-from shapely.geometry import Point, LineString
-from shapely.ops import transform
-import streamlit.components.v1 as components
-import tempfile
-import os
-import zipfile
-
 # 初始化 session_state
 if 'nodes_df' not in st.session_state:
     st.session_state.nodes_df = None
