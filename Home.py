@@ -104,7 +104,7 @@ if st.button("生成河流数据并可视化"):
         # 将中心线投影到局部投影坐标系（以米为单位）
         expanded_center_line = transform(project, center_line)
 
-        extension_distance = st.number_input("河流宽度扩展距离 (米)", value=width_mean, step=10)  # 默认50米
+        extension_distance = st.number_input("河流宽度扩展距离 (米)", value=width_mean, step=10.0)  # 默认50米
         # 扩展中心线两侧的距离（河流宽度的一半）
         river_polygon = expanded_center_line.buffer(extension_distance)
 
