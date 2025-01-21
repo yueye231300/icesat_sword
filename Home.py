@@ -62,11 +62,6 @@ if 'width_mean' not in st.session_state:
 if 'buffer_geojson' not in st.session_state:
     st.session_state.buffer_geojson = None
 
-# 输入参数
-longitude = st.number_input("经度", value=116.3)
-latitude = st.number_input("纬度", value=39.9)
-buffer_distance = st.number_input("缓冲区距离（米）", value=1000)
-
 def fetch_river_data():
     """获取河流数据"""
     try:
