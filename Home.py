@@ -16,10 +16,13 @@ import streamlit.components.v1 as components  # 用于嵌入 HTML
 # 从环境变量中读取 refresh_token
 refresh_token = os.getenv("EARTHENGINE_TOKEN")
 
-# 使用 refresh_token 初始化 GEE
-credentials = ee.Credentials(
-    refresh_token=refresh_token
-)
+if refresh_token:
+    credentials = ee.ServiceAccountCredentials('', key_data=None, refresh_token=refresh_token)
+    ee.Initialize(credentials)
+    st.write("Google Earth Engine 已成功授权！")
+else:
+    st.error("未找到Earth Engine认证token")
+    st.stop()
 ee.Initialize(credentials)
 st.write("Google Earth Engine 已成功授权！")
 
