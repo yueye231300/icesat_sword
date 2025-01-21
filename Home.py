@@ -28,7 +28,6 @@ def ee_initialize():
 
 # 初始化 Earth Engine
 is_authorized = ee_initialize()
-
 if is_authorized:
     st.success("Earth Engine 认证成功!")
     # 这里添加你的主程序代码
