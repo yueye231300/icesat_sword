@@ -13,11 +13,13 @@ from folium.plugins import MarkerCluster
 import streamlit.components.v1 as components  # 用于嵌入 HTML
 
 # 初始化 Google Earth Engine
-try:
-    ee.Initialize()
-except Exception as e:
-    ee.Authenticate()
-    ee.Initialize()
+# 从环境变量中读取 refresh_token
+refresh_token = os.getenv("EARTHENGINE_TOKEN")
+
+# 使用 refresh_token 初始化 GEE
+credentials = ee.ServiceAccountCredentials(None, key_data=None, refresh_token=refresh_token)
+ee.Initialize(credentials)
+st.write("Google Earth Engine 已成功授权！")
 
 # Streamlit 界面
 st.title("基于 SWORD 数据集的河流提取与可视化工具")
